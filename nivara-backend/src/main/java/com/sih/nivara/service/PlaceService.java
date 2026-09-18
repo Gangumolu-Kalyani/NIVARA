@@ -1,5 +1,6 @@
 package com.sih.nivara.service;
 
+import com.sih.nivara.entity.Patient;
 import com.sih.nivara.entity.Place;
 import com.sih.nivara.repository.PlaceRepository;
 import org.springframework.stereotype.Service;
@@ -7,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Service access to {@link Place} records in a patient's personal memory.
@@ -32,6 +34,14 @@ public class PlaceService {
     /** The place with this id, or empty when none exists. */
     public Optional<Place> findById(Long id) {
         return placeRepository.findById(id);
+    }
+
+    /**
+     * The place with this public uuid, provided it belongs to this patient. Empty when it does
+     * not exist or belongs to someone else, so callers cannot reach across patients.
+     */
+    public Optional<Place> findByUuidAndPatient(UUID uuid, Patient patient) {
+        return placeRepository.findByUuidAndPatient(uuid, patient);
     }
 
     /** Inserts a new place or updates an existing one. */
