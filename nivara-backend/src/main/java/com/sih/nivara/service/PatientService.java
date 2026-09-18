@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Service access to {@link Patient} records.
@@ -32,6 +33,11 @@ public class PatientService {
     /** The patient with this id, or empty when none exists. */
     public Optional<Patient> findById(Long id) {
         return patientRepository.findById(id);
+    }
+
+    /** The patient with this public uuid, or empty when none exists. */
+    public Optional<Patient> findByUuid(UUID uuid) {
+        return patientRepository.findByUuid(uuid);
     }
 
     /** Inserts a new patient or updates an existing one. */

@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Service access to {@link AppUser} login accounts.
@@ -30,6 +31,11 @@ public class UserService {
     /** The user account with this id, or empty when none exists. */
     public Optional<AppUser> findById(Long id) {
         return userRepository.findById(id);
+    }
+
+    /** The user account with this public uuid, or empty when none exists. */
+    public Optional<AppUser> findByUuid(UUID uuid) {
+        return userRepository.findByUuid(uuid);
     }
 
     /** Inserts a new user account or updates an existing one. */
