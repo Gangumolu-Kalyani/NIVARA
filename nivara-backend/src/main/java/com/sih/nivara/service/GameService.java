@@ -32,6 +32,16 @@ public class GameService {
         return gameRepository.findById(id);
     }
 
+    /** The game with this code, active or not, or empty when none exists. */
+    public Optional<Game> findByCode(String code) {
+        return gameRepository.findByCode(code);
+    }
+
+    /** The games currently offered to patients, by name. */
+    public List<Game> findActive() {
+        return gameRepository.findByActiveTrueOrderByNameAsc();
+    }
+
     /** Inserts a new game or updates an existing one. */
     @Transactional
     public Game save(Game game) {

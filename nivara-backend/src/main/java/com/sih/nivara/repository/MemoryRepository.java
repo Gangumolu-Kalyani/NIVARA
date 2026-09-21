@@ -13,10 +13,10 @@ import java.util.UUID;
 /**
  * CRUD access to {@link Memory} records in a patient's personal memory (table memories).
  *
- * <p>Both finders fetch the patient, place, people and objects with the memory. Those
- * associations are lazy and open-in-view is disabled, so a caller that maps a memory after the
- * transaction has closed would otherwise fail. The two collections are Sets, which is what
- * makes fetching both in one query safe.
+ * <p>The two finders the memory API maps from fetch the patient, place, people and objects
+ * with the memory. Those associations are lazy and open-in-view is disabled, so a caller that
+ * maps a memory after the transaction has closed would otherwise fail. The two collections are
+ * Sets, which is what makes fetching both in one query safe.
  */
 @Repository
 public interface MemoryRepository extends JpaRepository<Memory, Long> {
@@ -34,4 +34,11 @@ public interface MemoryRepository extends JpaRepository<Memory, Long> {
      */
     @EntityGraph(attributePaths = {"patient", "place", "people", "objects"})
     List<Memory> findByPatientOrderByOccurredOnDescIdDesc(Patient patient);
+
+    /**
+     * Looks one of this patient's memories up by its public uuid, for callers that only need to
+     * reference it, such as a game answer. Scoping the query to the patient keeps one patient's
+     * memories from being referenced by another's; no associations are fetched.
+     */
+    Optional<Memory> findByUuidAndPatient(UUID uuid, Patient patient);
 }

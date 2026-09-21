@@ -68,6 +68,14 @@ public class MemoryService {
         return memoryRepository.findByUuid(uuid);
     }
 
+    /**
+     * The memory with this public uuid, provided it belongs to this patient. Empty when it does
+     * not exist or belongs to someone else, so callers cannot reach across patients.
+     */
+    public Optional<Memory> findByUuidAndPatient(UUID uuid, Patient patient) {
+        return memoryRepository.findByUuidAndPatient(uuid, patient);
+    }
+
     /** One patient's memories, most recent first. */
     public List<Memory> findByPatient(Patient patient) {
         return memoryRepository.findByPatientOrderByOccurredOnDescIdDesc(patient);
