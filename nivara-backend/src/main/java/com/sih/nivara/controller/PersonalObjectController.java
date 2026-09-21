@@ -35,10 +35,10 @@ import java.util.UUID;
  * addressed by its own uuid. No entity crosses this boundary; {@link PersonalObjectMapper}
  * converts both ways.
  *
- * <p>Development stage: these endpoints are unauthenticated, and the item endpoints do not yet
- * check that the caller may see the owning patient. That check needs the authenticated
- * principal and arrives with Spring Security. The creating account comes from
- * {@link CurrentUserProvider}, never from the request.
+ * <p>Every endpoint here requires a bearer token, and the creating account is the one that
+ * authenticated the request, taken from {@link CurrentUserProvider}, never from the body. The item
+ * endpoints do not yet check that the caller may see the owning patient; that arrives with
+ * caregiver authorization.
  */
 @RestController
 public class PersonalObjectController {
@@ -57,7 +57,7 @@ public class PersonalObjectController {
 
     /**
      * Adds an object to this patient. Answers 201 with the new object and its Location, 404
-     * when the patient does not exist, or 503 while no caller can be established.
+     * when the patient does not exist, or 401 without a valid bearer token.
      */
     @PostMapping("/api/patients/{patientUuid}/objects")
     public ResponseEntity<PersonalObjectResponse> create(

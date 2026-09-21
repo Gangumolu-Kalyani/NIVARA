@@ -32,10 +32,10 @@ import java.util.UUID;
  * by {@link PatientMapper}. The controller holds no rules of its own, only the wiring
  * between the HTTP layer and {@link PatientService}.
  *
- * <p>Development stage: these endpoints are unauthenticated. Creating a patient needs the
- * account that owns the new row, which the controller asks {@link CurrentUserProvider} for.
- * That is the same call the controller will make once Spring Security supplies a real
- * authenticated principal, so no part of this API changes when security arrives.
+ * <p>Every endpoint here requires a bearer token. The account that owns a new patient is the one
+ * that authenticated the request, which the controller asks {@link CurrentUserProvider} for.
+ * Which patients an account may reach is not checked yet; that arrives with caregiver
+ * authorization.
  */
 @RestController
 @RequestMapping("/api/patients")
@@ -51,8 +51,7 @@ public class PatientController {
 
     /**
      * Creates a patient owned by the caller's account. Answers 201 with the new patient and
-     * its Location, or 503 while no caller can be established, which is the state until
-     * Spring Security is added.
+     * its Location, or 401 without a valid bearer token.
      */
     @PostMapping
     public ResponseEntity<PatientResponse> create(@Valid @RequestBody PatientCreateRequest request) {

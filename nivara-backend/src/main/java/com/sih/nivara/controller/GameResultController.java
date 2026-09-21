@@ -30,10 +30,10 @@ import java.util.UUID;
  * memory API. No entity crosses this boundary; {@link GameResultMapper} converts both ways, and
  * {@link GameResultService} applies the V3 rules inside one transaction.
  *
- * <p>Development stage: these endpoints are unauthenticated, and the item endpoint does not yet
- * check that the caller may see the owning patient. Recording still requires an acting account
- * from {@link CurrentUserProvider}, like every other write, although game_results stores no
- * creator: once Spring Security is added, that account is the patient's own login or a caregiver.
+ * <p>Every endpoint here requires a bearer token, and the item endpoint does not yet check that
+ * the caller may see the owning patient; that arrives with caregiver authorization. Recording
+ * requires an acting account from {@link CurrentUserProvider}, like every other write, although
+ * game_results stores no creator.
  */
 @RestController
 public class GameResultController {
@@ -55,7 +55,7 @@ public class GameResultController {
      * its Location. Replaying an upload whose uuid is already stored for this patient answers 200
      * with the stored attempt and writes nothing. Otherwise 400 for an inconsistent attempt, 404
      * for an unknown patient, game or answer subject, 409 for a uuid owned by another patient,
-     * or 503 while no caller can be established.
+     * or 401 without a valid bearer token.
      */
     @PostMapping("/api/patients/{patientUuid}/game-results")
     public ResponseEntity<GameResultResponse> record(@PathVariable UUID patientUuid,

@@ -39,9 +39,10 @@ import java.util.UUID;
  * {@link MemoryService}, which does it inside one transaction; this controller only wires HTTP
  * to that service.
  *
- * <p>Development stage: these endpoints are unauthenticated. Recording a memory needs the
- * account that captured it, which the controller asks {@link CurrentUserProvider} for, exactly
- * as the patient API does.
+ * <p>Every endpoint here requires a bearer token. The account recorded as having captured a
+ * memory is the one that authenticated the request, which the controller asks
+ * {@link CurrentUserProvider} for, exactly as the patient API does. Which patients an account may
+ * reach is not checked yet; that arrives with caregiver authorization.
  */
 @RestController
 public class MemoryController {
@@ -61,7 +62,7 @@ public class MemoryController {
     /**
      * Records a memory for this patient. Answers 201 with the new memory and its Location,
      * 404 when the patient or any referenced place, person or object is not this patient's,
-     * or 503 while no caller can be established.
+     * or 401 without a valid bearer token.
      */
     @PostMapping("/api/patients/{patientUuid}/memories")
     public ResponseEntity<MemoryResponse> create(@PathVariable UUID patientUuid,

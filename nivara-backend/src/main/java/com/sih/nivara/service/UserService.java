@@ -38,6 +38,16 @@ public class UserService {
         return userRepository.findByUuid(uuid);
     }
 
+    /** The account with this email, which must already be lowercase, or empty. */
+    public Optional<AppUser> findByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+
+    /** Whether an account already uses this lowercase email. */
+    public boolean existsByEmail(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
     /** Inserts a new user account or updates an existing one. */
     @Transactional
     public AppUser save(AppUser user) {
