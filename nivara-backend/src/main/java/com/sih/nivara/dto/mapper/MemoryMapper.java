@@ -3,9 +3,6 @@ package com.sih.nivara.dto.mapper;
 import com.sih.nivara.dto.request.MemoryCreateRequest;
 import com.sih.nivara.dto.request.MemoryUpdateRequest;
 import com.sih.nivara.dto.response.MemoryResponse;
-import com.sih.nivara.dto.response.PersonSummaryResponse;
-import com.sih.nivara.dto.response.PersonalObjectSummaryResponse;
-import com.sih.nivara.dto.response.PlaceSummaryResponse;
 import com.sih.nivara.entity.AppUser;
 import com.sih.nivara.entity.Memory;
 import com.sih.nivara.entity.Patient;
@@ -26,8 +23,8 @@ import java.util.Set;
  * lazy, so the memory must have been loaded with them fetched or be mapped inside the
  * transaction that loaded it.
  *
- * <p>The three summary conversions live here while memories are the only API that needs them.
- * They move to their own mappers when the people, places and objects APIs are built.
+ * <p>The embedded place, people and objects summaries come from {@link PlaceMapper},
+ * {@link PersonMapper} and {@link PersonalObjectMapper}, which own those types.
  */
 public final class MemoryMapper {
 
@@ -93,35 +90,13 @@ public final class MemoryMapper {
                 memory.getMemoryType(),
                 memory.getOccurredOn(),
                 memory.getTimeOfDay(),
-                memory.getPlace() == null ? null : toSummary(memory.getPlace()),
+                memory.getPlace() == null ? null : PlaceMapper.toSummary(memory.getPlace()),
                 memory.getLanguageCode(),
                 memory.getSource(),
                 memory.isIncludeInGames(),
-                memory.getPeople().stream().map(MemoryMapper::toSummary).toList(),
-                memory.getObjects().stream().map(MemoryMapper::toSummary).toList(),
+                memory.getPeople().stream().map(PersonMapper::toSummary).toList(),
+                memory.getObjects().stream().map(PersonalObjectMapper::toSummary).toList(),
                 memory.getCreatedAt(),
                 memory.getUpdatedAt());
-    }
-
-    public static PersonSummaryResponse toSummary(Person person) {
-        return new PersonSummaryResponse(
-                person.getUuid(),
-                person.getFullName(),
-                person.getCalledAs(),
-                person.getRelationship());
-    }
-
-    public static PlaceSummaryResponse toSummary(Place place) {
-        return new PlaceSummaryResponse(
-                place.getUuid(),
-                place.getName(),
-                place.getPlaceType());
-    }
-
-    public static PersonalObjectSummaryResponse toSummary(PersonalObject personalObject) {
-        return new PersonalObjectSummaryResponse(
-                personalObject.getUuid(),
-                personalObject.getName(),
-                personalObject.getCategory());
     }
 }
