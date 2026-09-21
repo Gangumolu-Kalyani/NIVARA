@@ -7,9 +7,10 @@ import com.sih.nivara.dto.response.MemoryResponse;
 import com.sih.nivara.entity.AppUser;
 import com.sih.nivara.entity.Memory;
 import com.sih.nivara.entity.Patient;
+import com.sih.nivara.entity.enums.AccessLevel;
 import com.sih.nivara.security.CurrentUserProvider;
 import com.sih.nivara.service.MemoryService;
-import com.sih.nivara.service.PatientService;
+import com.sih.nivara.service.PatientAccessService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,35 +40,37 @@ import java.util.UUID;
  * {@link MemoryService}, which does it inside one transaction; this controller only wires HTTP
  * to that service.
  *
- * <p>Every endpoint here requires a bearer token. The account recorded as having captured a
- * memory is the one that authenticated the request, which the controller asks
- * {@link CurrentUserProvider} for, exactly as the patient API does. Which patients an account may
- * reach is not checked yet; that arrives with caregiver authorization.
+ * <p>Every endpoint requires a bearer token and is authorized by {@link PatientAccessService}
+ * against patient_caregivers: reading needs VIEWER and writing needs EDITOR access to the patient.
+ * The item endpoints authorize against the memory's own patient, and a memory under a patient the
+ * caller has no link to answers 404. The account recorded as having captured a memory is the one
+ * that authenticated the request, taken from {@link CurrentUserProvider}.
  */
 @RestController
 public class MemoryController {
 
     private final MemoryService memoryService;
-    private final PatientService patientService;
+    private final PatientAccessService patientAccessService;
     private final CurrentUserProvider currentUserProvider;
 
     public MemoryController(MemoryService memoryService,
-                            PatientService patientService,
+                            PatientAccessService patientAccessService,
                             CurrentUserProvider currentUserProvider) {
         this.memoryService = memoryService;
-        this.patientService = patientService;
+        this.patientAccessService = patientAccessService;
         this.currentUserProvider = currentUserProvider;
     }
 
     /**
      * Records a memory for this patient. Answers 201 with the new memory and its Location,
-     * 404 when the patient or any referenced place, person or object is not this patient's,
-     * or 401 without a valid bearer token.
+     * 404 when the patient or any referenced place, person or object is not this patient's or the
+     * caller has no access to the patient, 403 without EDITOR access, or 401 without a valid
+     * bearer token.
      */
     @PostMapping("/api/patients/{patientUuid}/memories")
     public ResponseEntity<MemoryResponse> create(@PathVariable UUID patientUuid,
                                                  @Valid @RequestBody MemoryCreateRequest request) {
-        Patient patient = requirePatient(patientUuid);
+        Patient patient = patientAccessService.requirePatient(patientUuid, AccessLevel.EDITOR);
         AppUser recordedByUser = currentUserProvider.currentUser()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                         "No acting account is available yet"));
@@ -83,7 +86,7 @@ public class MemoryController {
      */
     @GetMapping("/api/patients/{patientUuid}/memories")
     public List<MemoryResponse> findByPatient(@PathVariable UUID patientUuid) {
-        Patient patient = requirePatient(patientUuid);
+        Patient patient = patientAccessService.requirePatient(patientUuid, AccessLevel.VIEWER);
         return memoryService.findByPatient(patient).stream()
                 .map(MemoryMapper::toResponse)
                 .toList();
@@ -91,22 +94,19 @@ public class MemoryController {
 
     @GetMapping("/api/memories/{uuid}")
     public MemoryResponse findByUuid(@PathVariable UUID uuid) {
-        return MemoryMapper.toResponse(memoryService.findByUuid(uuid)
-                .orElseThrow(() -> notFoundMemory(uuid)));
+        Memory memory = memoryService.findByUuid(uuid).orElseThrow(() -> notFoundMemory(uuid));
+        patientAccessService.requireAccess(memory.getPatient(), AccessLevel.VIEWER, () -> notFoundMemory(uuid));
+        return MemoryMapper.toResponse(memory);
     }
 
     /** Replaces the editable fields and the links of an existing memory. */
     @PutMapping("/api/memories/{uuid}")
     public MemoryResponse update(@PathVariable UUID uuid,
                                  @Valid @RequestBody MemoryUpdateRequest request) {
+        Memory memory = memoryService.findByUuid(uuid).orElseThrow(() -> notFoundMemory(uuid));
+        patientAccessService.requireAccess(memory.getPatient(), AccessLevel.EDITOR, () -> notFoundMemory(uuid));
         return MemoryMapper.toResponse(memoryService.update(uuid, request)
                 .orElseThrow(() -> notFoundMemory(uuid)));
-    }
-
-    private Patient requirePatient(UUID patientUuid) {
-        return patientService.findByUuid(patientUuid)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "No patient with uuid " + patientUuid));
     }
 
     private static ResponseStatusException notFoundMemory(UUID uuid) {

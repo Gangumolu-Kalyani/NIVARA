@@ -5,6 +5,7 @@ import com.sih.nivara.dto.request.PatientUpdateRequest;
 import com.sih.nivara.dto.response.PatientResponse;
 import com.sih.nivara.entity.AppUser;
 import com.sih.nivara.entity.Patient;
+import com.sih.nivara.entity.enums.AccessLevel;
 
 /**
  * Explicit conversion between the patient DTOs and {@link Patient}.
@@ -53,7 +54,8 @@ public final class PatientMapper {
         patient.setTimezone(request.timezone());
     }
 
-    public static PatientResponse toResponse(Patient patient) {
+    /** The patient as the API returns it, with the requesting account's own access level. */
+    public static PatientResponse toResponse(Patient patient, AccessLevel accessLevel) {
         return new PatientResponse(
                 patient.getUuid(),
                 patient.getFullName(),
@@ -63,6 +65,7 @@ public final class PatientMapper {
                 patient.getPreferredLanguage(),
                 patient.getTimezone(),
                 patient.getCreatedAt(),
-                patient.getUpdatedAt());
+                patient.getUpdatedAt(),
+                accessLevel);
     }
 }

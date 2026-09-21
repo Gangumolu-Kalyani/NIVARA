@@ -6,9 +6,10 @@ import com.sih.nivara.dto.request.PlaceUpdateRequest;
 import com.sih.nivara.dto.response.PlaceResponse;
 import com.sih.nivara.entity.AppUser;
 import com.sih.nivara.entity.Patient;
+import com.sih.nivara.entity.enums.AccessLevel;
 import com.sih.nivara.entity.Place;
 import com.sih.nivara.security.CurrentUserProvider;
-import com.sih.nivara.service.PatientService;
+import com.sih.nivara.service.PatientAccessService;
 import com.sih.nivara.service.PlaceService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -32,34 +33,36 @@ import java.util.UUID;
  * immutable, so a place is created and listed within one patient, then addressed by its own
  * uuid. No entity crosses this boundary; {@link PlaceMapper} converts both ways.
  *
- * <p>Every endpoint here requires a bearer token, and the creating account is the one that
- * authenticated the request, taken from {@link CurrentUserProvider}, never from the body. The item
- * endpoints do not yet check that the caller may see the owning patient; that arrives with
- * caregiver authorization.
+ * <p>Every endpoint requires a bearer token and is authorized by {@link PatientAccessService}
+ * against patient_caregivers: reading needs VIEWER and writing needs EDITOR access to the patient.
+ * The item endpoints authorize against the item's own patient, and an item under a patient the
+ * caller has no link to answers 404, exactly like one that does not exist. The creating account is
+ * the one that authenticated the request, taken from {@link CurrentUserProvider}, never from the body.
  */
 @RestController
 public class PlaceController {
 
     private final PlaceService placeService;
-    private final PatientService patientService;
+    private final PatientAccessService patientAccessService;
     private final CurrentUserProvider currentUserProvider;
 
     public PlaceController(PlaceService placeService,
-                           PatientService patientService,
+                           PatientAccessService patientAccessService,
                            CurrentUserProvider currentUserProvider) {
         this.placeService = placeService;
-        this.patientService = patientService;
+        this.patientAccessService = patientAccessService;
         this.currentUserProvider = currentUserProvider;
     }
 
     /**
      * Adds a place to this patient. Answers 201 with the new place and its Location, 404 when
-     * the patient does not exist, or 401 without a valid bearer token.
+     * the patient does not exist or the caller has no access to it, 403 without EDITOR access, or
+     * 401 without a valid bearer token.
      */
     @PostMapping("/api/patients/{patientUuid}/places")
     public ResponseEntity<PlaceResponse> create(@PathVariable UUID patientUuid,
                                                 @Valid @RequestBody PlaceCreateRequest request) {
-        Patient patient = requirePatient(patientUuid);
+        Patient patient = patientAccessService.requirePatient(patientUuid, AccessLevel.EDITOR);
         AppUser createdByUser = currentUserProvider.currentUser()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                         "No acting account is available yet"));
@@ -72,7 +75,7 @@ public class PlaceController {
     /** This patient's places, by name. Unpaged, and soft-deleted rows are not excluded. */
     @GetMapping("/api/patients/{patientUuid}/places")
     public List<PlaceResponse> findByPatient(@PathVariable UUID patientUuid) {
-        Patient patient = requirePatient(patientUuid);
+        Patient patient = patientAccessService.requirePatient(patientUuid, AccessLevel.VIEWER);
         return placeService.findByPatient(patient).stream()
                 .map(PlaceMapper::toResponse)
                 .toList();
@@ -80,22 +83,19 @@ public class PlaceController {
 
     @GetMapping("/api/places/{uuid}")
     public PlaceResponse findByUuid(@PathVariable UUID uuid) {
-        return PlaceMapper.toResponse(placeService.findByUuid(uuid)
-                .orElseThrow(() -> notFound(uuid)));
+        Place place = placeService.findByUuid(uuid).orElseThrow(() -> notFound(uuid));
+        patientAccessService.requireAccess(place.getPatient(), AccessLevel.VIEWER, () -> notFound(uuid));
+        return PlaceMapper.toResponse(place);
     }
 
     /** Replaces the editable fields of an existing place. */
     @PutMapping("/api/places/{uuid}")
     public PlaceResponse update(@PathVariable UUID uuid,
                                 @Valid @RequestBody PlaceUpdateRequest request) {
+        Place place = placeService.findByUuid(uuid).orElseThrow(() -> notFound(uuid));
+        patientAccessService.requireAccess(place.getPatient(), AccessLevel.EDITOR, () -> notFound(uuid));
         return PlaceMapper.toResponse(placeService.update(uuid, request)
                 .orElseThrow(() -> notFound(uuid)));
-    }
-
-    private Patient requirePatient(UUID patientUuid) {
-        return patientService.findByUuid(patientUuid)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "No patient with uuid " + patientUuid));
     }
 
     private static ResponseStatusException notFound(UUID uuid) {

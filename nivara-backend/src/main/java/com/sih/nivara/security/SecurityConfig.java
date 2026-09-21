@@ -31,7 +31,7 @@ import java.nio.charset.StandardCharsets;
  * support, so there is no session, no cookie and therefore no CSRF surface.
  *
  * <p>This decides only whether a caller is authenticated. Which patients an authenticated account
- * may reach is not decided here yet: that is caregiver authorization, a later phase.
+ * may reach is decided per request by PatientAccessService, from patient_caregivers.
  */
 @Configuration
 @EnableWebSecurity

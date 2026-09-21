@@ -1,6 +1,7 @@
 package com.sih.nivara.dto.request;
 
 import com.sih.nivara.entity.enums.CognitiveStage;
+import com.sih.nivara.entity.enums.RelationshipType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -14,6 +15,9 @@ import jakarta.validation.constraints.Size;
  * <p>Bounds mirror table patients (V1): column lengths and the CHECK constraints
  * ck_patients_full_name_not_blank, ck_patients_birth_year and ck_patients_preferred_language.
  * A null optional field means "use the column default", not "clear it".
+ *
+ * <p>relationship is how the creating caregiver relates to the patient. The creator becomes the
+ * patient's OWNER and primary caregiver; when relationship is omitted it is recorded as CAREGIVER.
  */
 public record PatientCreateRequest(
 
@@ -35,5 +39,7 @@ public record PatientCreateRequest(
         String preferredLanguage,
 
         @Size(max = 40)
-        String timezone) {
+        String timezone,
+
+        RelationshipType relationship) {
 }
