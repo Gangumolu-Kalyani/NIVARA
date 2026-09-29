@@ -1,0 +1,139 @@
+/* NIVARA caregiver app design tokens: warm, calm, premium, accessible.
+   Palette: ivory/cream ground, muted lavender + soft teal accents, gentle indigo for
+   primary actions, subtle green for positive/confirmed states. No heavy gradients. */
+
+:root {
+  --color-bg: #faf6f0;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border: #e7ddce;
+
+  --color-text: #2b2521;
+  --color-text-muted: #6b6157;
+  --color-text-faint: #948a7d;
+
+  --color-indigo: #4b4a9e;
+  --color-indigo-soft: #eceafb;
+  --color-teal: #2f8f83;
+  --color-teal-soft: #e3f4f1;
+  --color-lavender: #8b7ec8;
+  --color-lavender-soft: #efeafb;
+
+  --color-success: #2f7d4f;
+  --color-success-soft: #e7f5ec;
+  --color-warning: #b9791a;
+  --color-warning-soft: #fbf0dd;
+  --color-danger: #c1443f;
+  --color-danger-soft: #fbe9e8;
+  --color-neutral-soft: #f0ece4;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 3px rgba(43, 37, 33, 0.06), 0 1px 2px rgba(43, 37, 33, 0.08);
+  --shadow-md: 0 4px 14px rgba(43, 37, 33, 0.08);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --font-size-sm: 15px;
+  --font-size-base: 17px;
+  --font-size-lg: 20px;
+  --font-size-xl: 26px;
+  --font-size-xxl: 32px;
+
+  --nav-height: 68px;
+  --content-max-width: 640px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #1c1a18;
+    --color-surface: #262320;
+    --color-surface-raised: #2c2825;
+    --color-border: #3c3733;
+
+    --color-text: #f3efe9;
+    --color-text-muted: #c3bab0;
+    --color-text-faint: #948a7d;
+
+    --color-indigo: #a6a4f0;
+    --color-indigo-soft: #2c2a52;
+    --color-teal: #6ecdc0;
+    --color-teal-soft: #1f3a36;
+    --color-lavender: #b8aee8;
+    --color-lavender-soft: #322c52;
+
+    --color-success: #7bd39a;
+    --color-success-soft: #1f3a29;
+    --color-warning: #e8b563;
+    --color-warning-soft: #3d3018;
+    --color-danger: #ef8f8a;
+    --color-danger-soft: #3d2422;
+    --color-neutral-soft: #322d28;
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #1c1a18;
+  --color-surface: #262320;
+  --color-surface-raised: #2c2825;
+  --color-border: #3c3733;
+
+  --color-text: #f3efe9;
+  --color-text-muted: #c3bab0;
+  --color-text-faint: #948a7d;
+
+  --color-indigo: #a6a4f0;
+  --color-indigo-soft: #2c2a52;
+  --color-teal: #6ecdc0;
+  --color-teal-soft: #1f3a36;
+  --color-lavender: #b8aee8;
+  --color-lavender-soft: #322c52;
+
+  --color-success: #7bd39a;
+  --color-success-soft: #1f3a29;
+  --color-warning: #e8b563;
+  --color-warning-soft: #3d3018;
+  --color-danger: #ef8f8a;
+  --color-danger-soft: #3d2422;
+  --color-neutral-soft: #322d28;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}
