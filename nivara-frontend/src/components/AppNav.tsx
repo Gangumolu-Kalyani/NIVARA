@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: "/daily-care", icon: "🧭", label: "Daily Care" },
   { to: "/alerts", icon: "🔔", label: "Alerts" },
   { to: "/patient", icon: "👤", label: "Patient" },
+  { to: "/assistant", icon: "💬", label: "Assistant" },
 ];
 
 function navLinkClass({ isActive }: { isActive: boolean }) {

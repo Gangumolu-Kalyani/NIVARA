@@ -9,6 +9,7 @@ import { DailyCarePage } from "./pages/DailyCarePage";
 import { AlertsPage } from "./pages/AlertsPage";
 import { AlertDetailPage } from "./pages/AlertDetailPage";
 import { PatientPage } from "./pages/PatientPage";
+import { AssistantPage } from "./pages/AssistantPage";
 
 function AuthedApp() {
   return (
@@ -22,6 +23,7 @@ function AuthedApp() {
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/alerts/:uuid" element={<AlertDetailPage />} />
           <Route path="/patient" element={<PatientPage />} />
+          <Route path="/assistant" element={<AssistantPage />} />
           <Route path="*" element={<Navigate to="/overview" replace />} />
         </Routes>
       </div>

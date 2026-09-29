@@ -116,8 +116,21 @@ public class AssistantResponder {
                     log.warn("Assistant exchange ran out of time after {} round(s)", round - 1);
                     return fallback();
                 }
-                LlmResponse response = llmClient.chat(new LlmChatRequest(messages, tools,
-                        lastRound ? LlmChatRequest.ToolChoice.NONE : LlmChatRequest.ToolChoice.AUTO, remaining));
+                LlmResponse response;
+                try {
+                    response = llmClient.chat(new LlmChatRequest(messages, tools,
+                            lastRound ? LlmChatRequest.ToolChoice.NONE : LlmChatRequest.ToolChoice.AUTO, remaining));
+                } catch (RuntimeException e) {
+                    // A bug or misconfiguration in the client, not a provider answer: the user still gets
+                    // the fallback rather than an HTTP 500. Only the type is logged; its message could
+                    // carry request details.
+                    log.error("Assistant model client failed unexpectedly ({})", e.getClass().getName());
+                    return fallback();
+                }
+                if (response == null) {
+                    log.error("Assistant model client returned no response");
+                    return fallback();
+                }
 
                 if (response instanceof LlmResponse.FinalText text) {
                     return finalReply(text);

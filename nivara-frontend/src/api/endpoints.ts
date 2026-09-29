@@ -2,6 +2,10 @@ import { api } from "./client";
 import type {
   AccountResponse,
   AlertResponse,
+  ConversationDetailResponse,
+  ConversationResponse,
+  MessageExchangeResponse,
+  TranscriptionResponse,
   AlertStatus,
   DailySummaryResponse,
   DashboardSummaryResponse,
@@ -68,4 +72,24 @@ export const AlertsApi = {
   get: (uuid: string) => api.get<AlertResponse>(`/api/alerts/${uuid}`),
   resolve: (uuid: string) => api.put<AlertResponse>(`/api/alerts/${uuid}/resolve`),
   dismiss: (uuid: string) => api.put<AlertResponse>(`/api/alerts/${uuid}/dismiss`),
+};
+
+const CONVERSATIONS = "/api/assistant/conversations";
+
+export const AssistantApi = {
+  list: () => api.get<ConversationResponse[]>(CONVERSATIONS),
+  get: (uuid: string) => api.get<ConversationDetailResponse>(`${CONVERSATIONS}/${uuid}`),
+  start: (patientUuid?: string) =>
+    api.post<ConversationResponse>(CONVERSATIONS, patientUuid ? { patientUuid } : {}),
+  send: (uuid: string, content: string) =>
+    api.post<MessageExchangeResponse>(`${CONVERSATIONS}/${uuid}/messages`, { content }),
+  /** Transcribes a recording. Creates no message: send the transcript to add it to the conversation. */
+  transcribe: (uuid: string, recording: Blob, fileName: string) => {
+    const form = new FormData();
+    form.append("audio", recording, fileName);
+    return api.postForm<TranscriptionResponse>(`${CONVERSATIONS}/${uuid}/transcriptions`, form);
+  },
+  /** The spoken form of one assistant reply. */
+  speech: (uuid: string, messageUuid: string) =>
+    api.getBlob(`${CONVERSATIONS}/${uuid}/messages/${messageUuid}/speech`),
 };

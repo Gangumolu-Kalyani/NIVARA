@@ -38,6 +38,10 @@ public class AssistantService {
     public record ConversationView(AssistantConversation conversation, List<AssistantMessage> messages) {
     }
 
+    /** A conversation the caller owns and may still use, with the context resolved for it. */
+    public record AuthorizedConversation(AssistantConversation conversation, AssistantContext context) {
+    }
+
     /** One exchange: what the caller said and what the assistant answered. */
     public record Exchange(AssistantConversation conversation, AssistantMessage userMessage, AssistantMessage reply) {
     }
@@ -86,6 +90,19 @@ public class AssistantService {
                         || c.getPatient() == null
                         || reachable.contains(c.getPatient().getId()))
                 .toList();
+    }
+
+    /**
+     * One of the caller's conversations, after exactly the checks every other assistant request
+     * makes: the caller from the token, the conversation found by uuid and owner, and the
+     * conversation's patient re-checked. 404 for anybody else's conversation, or one whose patient
+     * the caller can no longer reach. For voice, which must authorize before any audio reaches a
+     * speech provider.
+     */
+    public AuthorizedConversation authorizeConversation(UUID conversationUuid) {
+        AppUser caller = contextResolver.requireCaller();
+        AssistantConversation conversation = requireOwned(conversationUuid, caller);
+        return new AuthorizedConversation(conversation, contextResolver.forConversation(caller, conversation));
     }
 
     /** One of the caller's conversations with all its messages; 404 for anybody else's. */

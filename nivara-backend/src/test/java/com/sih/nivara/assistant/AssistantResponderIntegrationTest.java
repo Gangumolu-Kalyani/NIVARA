@@ -387,6 +387,30 @@ class AssistantResponderIntegrationTest extends EmbeddedPostgresIntegrationTest 
     }
 
     @Test
+    void anUnexpectedClientErrorAlsoGetsTheFallbackNotAnError() {
+        Seed seed = seed("Crash Carer", "{\"fullName\":\"Crash Patient\"}");
+        String conversation = text(expect(201, "POST", CONVERSATIONS, seed.patientToken(), null).body(), "uuid");
+
+        model.script.add(request -> {
+            throw new IllegalStateException("secret-detail-that-must-not-leak");
+        });
+        JsonNode exchange = say(seed.patientToken(), conversation, "Hello?");
+        assertEquals(AssistantResponder.FALLBACK_REPLY, reply(exchange));
+        assertFalse(exchange.toString().contains("secret-detail"));
+
+        model.script.add(request -> null);
+        assertEquals(AssistantResponder.FALLBACK_REPLY, reply(say(seed.patientToken(), conversation, "Still there?")));
+
+        List<Map<String, Object>> stored = jdbc.queryForList("""
+                SELECT m.sender, m.generated_by FROM assistant_messages m
+                JOIN assistant_conversations c ON c.id = m.conversation_id
+                WHERE c.uuid = ?::uuid ORDER BY m.sequence_number""", conversation);
+        assertEquals(4, stored.size(), "each message stored once, each answered by the fallback");
+        assertEquals("fallback", stored.get(1).get("generated_by"));
+        assertEquals("fallback", stored.get(3).get("generated_by"));
+    }
+
+    @Test
     void theWholeExchangeHasADeadline() {
         Seed seed = seed("Slow Carer", "{\"fullName\":\"Slow Patient\"}");
         String conversation = text(expect(201, "POST", CONVERSATIONS, seed.patientToken(), null).body(), "uuid");

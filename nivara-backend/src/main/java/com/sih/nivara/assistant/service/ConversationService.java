@@ -66,6 +66,11 @@ public class ConversationService {
         return messageRepository.findByConversationOrderBySequenceNumberAsc(conversation);
     }
 
+    /** A message of this conversation; empty for a message of any other conversation. */
+    public Optional<AssistantMessage> findMessage(AssistantConversation conversation, UUID messageUuid) {
+        return messageRepository.findByUuidAndConversation(messageUuid, conversation);
+    }
+
     /** The latest messages, at most limit of them, oldest first. */
     public List<AssistantMessage> recentMessages(AssistantConversation conversation, int limit) {
         List<AssistantMessage> newestFirst = new ArrayList<>(

@@ -233,3 +233,47 @@ export interface DailySummaryResponse {
   careRhythm: { morning: CareRhythmLevel; afternoon: CareRhythmLevel; evening: CareRhythmLevel };
   patterns: string[];
 }
+
+// ---- Assistant -------------------------------------------------------------------------------
+
+export type AssistantMode = "PATIENT" | "CAREGIVER";
+export type ConversationStatus = "ACTIVE" | "CLOSED";
+export type MessageSender = "USER" | "ASSISTANT";
+
+export interface ConversationResponse {
+  uuid: string;
+  mode: AssistantMode;
+  patientUuid: string | null;
+  patientName: string | null;
+  languageCode: string;
+  status: ConversationStatus;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+}
+
+export interface AssistantMessageResponse {
+  uuid: string;
+  sequenceNumber: number;
+  sender: MessageSender;
+  content: string;
+  createdAt: string;
+}
+
+export interface ConversationDetailResponse {
+  conversation: ConversationResponse;
+  messages: AssistantMessageResponse[];
+}
+
+export interface MessageExchangeResponse {
+  conversationUuid: string;
+  userMessage: AssistantMessageResponse;
+  reply: AssistantMessageResponse;
+}
+
+/** What was heard. Nothing is stored until the transcript is sent as a message. */
+export interface TranscriptionResponse {
+  transcript: string;
+  languageCode: string;
+  detectedLanguageCode: string | null;
+}
