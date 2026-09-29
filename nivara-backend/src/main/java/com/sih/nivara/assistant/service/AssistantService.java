@@ -3,10 +3,6 @@ package com.sih.nivara.assistant.service;
 import com.sih.nivara.assistant.entity.AssistantConversation;
 import com.sih.nivara.assistant.entity.AssistantMessage;
 import com.sih.nivara.assistant.entity.enums.AssistantMode;
-import com.sih.nivara.assistant.llm.LlmClient;
-import com.sih.nivara.assistant.llm.LlmReply;
-import com.sih.nivara.assistant.llm.LlmRequest;
-import com.sih.nivara.assistant.tool.AssistantToolRegistry;
 import com.sih.nivara.entity.AppUser;
 import com.sih.nivara.service.PatientAccessService;
 import org.springframework.stereotype.Service;
@@ -24,9 +20,10 @@ import java.util.stream.Collectors;
  * not found (404). {@link AssistantContextResolver} then re-checks that the caller may still talk
  * about the conversation's patient. Only after that is anything read or written.
  *
- * <p>Sending a message stores it, asks the {@link LlmClient} for a reply, and stores the reply.
- * The model is called outside any database transaction, so a slow model holds no locks. Phase 2
- * wires in {@code PlaceholderLlmClient}; a real model replaces it without changes here.
+ * <p>Sending a message stores it, asks {@link AssistantResponder} for the reply, and stores the
+ * reply. The responder runs the language model and its tool calls outside any database
+ * transaction, so a slow model holds no locks; and it always produces a reply, falling back to a
+ * fixed one if the model fails, so the user's message never goes unanswered.
  *
  * <p>Not transactional itself: each step is its own short transaction in
  * {@link ConversationService}.
@@ -48,19 +45,16 @@ public class AssistantService {
     private final AssistantContextResolver contextResolver;
     private final ConversationService conversationService;
     private final PatientAccessService patientAccessService;
-    private final LlmClient llmClient;
-    private final AssistantToolRegistry toolRegistry;
+    private final AssistantResponder responder;
 
     public AssistantService(AssistantContextResolver contextResolver,
                             ConversationService conversationService,
                             PatientAccessService patientAccessService,
-                            LlmClient llmClient,
-                            AssistantToolRegistry toolRegistry) {
+                            AssistantResponder responder) {
         this.contextResolver = contextResolver;
         this.conversationService = conversationService;
         this.patientAccessService = patientAccessService;
-        this.llmClient = llmClient;
-        this.toolRegistry = toolRegistry;
+        this.responder = responder;
     }
 
     /**
@@ -113,8 +107,8 @@ public class AssistantService {
 
         AssistantMessage userMessage = conversationService.appendUserMessage(conversation, caller, content.strip());
 
-        LlmReply reply = llmClient.reply(toLlmRequest(context,
-                conversationService.recentMessages(conversation, HISTORY_LIMIT)));
+        AssistantResponder.Reply reply = responder.respond(context,
+                conversationService.recentMessages(conversation, HISTORY_LIMIT));
 
         AssistantMessage assistantMessage = conversationService.appendAssistantMessage(
                 conversation, reply.content(), reply.generatedBy());
@@ -138,18 +132,5 @@ public class AssistantService {
     /** Reads the conversation again with its owner and patient fetched, for the response. */
     private AssistantConversation reload(UUID conversationUuid, AppUser caller) {
         return requireOwned(conversationUuid, caller);
-    }
-
-    /**
-     * The model is offered the tools of this conversation's mode. Phase 3 stops there: no model
-     * asks for a tool yet, so nothing here runs one. When one does, the call goes through
-     * ToolExecutor with this same context.
-     */
-    private LlmRequest toLlmRequest(AssistantContext context, List<AssistantMessage> history) {
-        return new LlmRequest(context.mode(), context.languageCode(),
-                history.stream()
-                        .map(m -> new LlmRequest.Message(m.getSender(), m.getContent()))
-                        .toList(),
-                toolRegistry.toolsFor(context.mode()));
     }
 }

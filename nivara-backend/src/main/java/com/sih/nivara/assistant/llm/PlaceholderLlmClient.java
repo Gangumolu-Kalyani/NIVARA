@@ -1,20 +1,17 @@
 package com.sih.nivara.assistant.llm;
 
-import org.springframework.stereotype.Component;
-
 /**
- * Stands in for a language model until one is connected (Phase 4): always gives the same answer,
- * makes no network call, and needs no configuration or credentials. It ignores the tools it is
- * offered and never asks for one to run.
+ * Stands in for a language model when none is configured, which is the default: always gives the
+ * same answer, makes no network call, and needs no configuration or credentials. It ignores the
+ * tools it is offered and never asks for one to run. Created by {@link LlmConfiguration}.
  */
-@Component
 public class PlaceholderLlmClient implements LlmClient {
 
     public static final String REPLY = "Assistant is not connected to the language model yet.";
     public static final String GENERATED_BY = "placeholder";
 
     @Override
-    public LlmReply reply(LlmRequest request) {
-        return new LlmReply(REPLY, GENERATED_BY);
+    public LlmResponse chat(LlmChatRequest request) {
+        return new LlmResponse.FinalText(REPLY, GENERATED_BY);
     }
 }

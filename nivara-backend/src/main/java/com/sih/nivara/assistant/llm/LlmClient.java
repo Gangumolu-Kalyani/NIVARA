@@ -1,18 +1,21 @@
 package com.sih.nivara.assistant.llm;
 
 /**
- * The one seam between the assistant and a language model.
+ * The one seam between the assistant and a language model provider.
  *
- * <p>{@code AssistantService} decides who is asking, about which patient, and what may be seen;
- * an implementation of this interface only turns a conversation into the assistant's next reply.
- * It never receives an account, a token or a database handle, so a model can never make an
- * authorization decision.
+ * <p>An implementation only talks to its provider: it turns an {@link LlmChatRequest} into the
+ * provider's format, sends it, and turns the answer into an {@link LlmResponse}. It never runs a
+ * tool, never sees an account or token, and makes no authorization decision. The tool-calling loop
+ * lives in AssistantResponder, and tools run only through ToolExecutor.
  *
- * <p>Phase 2 ships {@link PlaceholderLlmClient}. A real model (Phase 4) is another implementation
- * of this interface; AssistantService does not change.
+ * <p>Which implementation is used is decided by {@code nivara.assistant.llm.provider}:
+ * {@link PlaceholderLlmClient} by default, or {@link OpenRouterLlmClient}.
  */
 public interface LlmClient {
 
-    /** The assistant's next reply to this conversation. */
-    LlmReply reply(LlmRequest request);
+    /**
+     * Asks the model for its next turn, within request.timeout(), retrying at most once when a
+     * retry may help. Throws when the model could not answer.
+     */
+    LlmResponse chat(LlmChatRequest request) throws LlmException;
 }

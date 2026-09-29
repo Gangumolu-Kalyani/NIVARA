@@ -1,9 +1,10 @@
 package com.sih.nivara.assistant.tool;
 
 import com.sih.nivara.assistant.entity.enums.AssistantMode;
+import com.sih.nivara.assistant.llm.LlmChatRequest;
 import com.sih.nivara.assistant.llm.LlmClient;
-import com.sih.nivara.assistant.llm.LlmReply;
-import com.sih.nivara.assistant.llm.LlmRequest;
+import com.sih.nivara.assistant.llm.LlmMessage;
+import com.sih.nivara.assistant.llm.LlmResponse;
 import com.sih.nivara.assistant.llm.PlaceholderLlmClient;
 import com.sih.nivara.assistant.service.AssistantContext;
 import com.sih.nivara.assistant.service.AssistantContextResolver;
@@ -49,14 +50,14 @@ class ToolExecutorIntegrationTest extends EmbeddedPostgresIntegrationTest {
     /** Records what the assistant offers a model, and answers like the placeholder. */
     @TestConfiguration
     static class RecordingLlmConfiguration {
-        static final AtomicReference<LlmRequest> LAST = new AtomicReference<>();
+        static final AtomicReference<LlmChatRequest> LAST = new AtomicReference<>();
 
         @Bean
         @Primary
         LlmClient recordingLlmClient() {
             return request -> {
                 LAST.set(request);
-                return new LlmReply(PlaceholderLlmClient.REPLY, PlaceholderLlmClient.GENERATED_BY);
+                return new LlmResponse.FinalText(PlaceholderLlmClient.REPLY, PlaceholderLlmClient.GENERATED_BY);
             };
         }
     }
@@ -173,8 +174,9 @@ class ToolExecutorIntegrationTest extends EmbeddedPostgresIntegrationTest {
         JsonNode exchange = expect(200, "POST", "/api/assistant/conversations/" + patientConversation + "/messages",
                 patientToken, "{\"content\":\"What is my next reminder?\"}").body();
         assertEquals(PlaceholderLlmClient.REPLY, text(exchange.get("reply"), "content"));
-        LlmRequest offered = RecordingLlmConfiguration.LAST.get();
-        assertEquals(AssistantMode.PATIENT, offered.mode());
+        LlmChatRequest offered = RecordingLlmConfiguration.LAST.get();
+        assertTrue(offered.messages().get(0) instanceof LlmMessage.System system
+                && system.content().contains("older person who may have memory difficulties"), "patient prompt");
         assertEquals(Set.of("get_today_reminders", "get_next_reminder", "get_people", "search_memories"),
                 Set.copyOf(offered.tools().stream().map(ToolDefinition::name).toList()));
 

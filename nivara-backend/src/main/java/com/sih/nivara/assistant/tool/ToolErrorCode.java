@@ -14,6 +14,10 @@ public enum ToolErrorCode {
     FORBIDDEN,
     /** The patient does not exist, or the caller has no access to it. */
     NOT_FOUND,
+    /** The tool changes data and needs the user's confirmation, which is not available yet. */
+    CONFIRMATION_REQUIRED,
+    /** The model asked for more tool calls in one round than allowed; this one was not run. */
+    CALL_LIMIT_EXCEEDED,
     /** Something unexpected went wrong; the details are logged, not returned. */
     INTERNAL_ERROR
 }
