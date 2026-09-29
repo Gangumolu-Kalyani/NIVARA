@@ -1,5 +1,6 @@
 package com.sih.nivara.security;
 
+import com.sih.nivara.entity.enums.UserRole;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -37,8 +38,10 @@ import java.util.List;
  * HS256 JWTs signed and verified with the JWT_SECRET key through Spring's own resource-server
  * support, so there is no session, no cookie and therefore no CSRF surface.
  *
- * <p>This decides only whether a caller is authenticated. Which patients an authenticated account
- * may reach is decided per request by PatientAccessService, from patient_caregivers.
+ * <p>Roles decide which part of the API a caller may use: PATIENT accounts, signed in on a paired
+ * device, reach only /api/me/** and their own /api/auth/me; the caregiver API is for CAREGIVER
+ * and ADMIN accounts. Which patients a caregiver may reach is then decided per request by
+ * PatientAccessService, from patient_caregivers.
  */
 @Configuration
 @EnableWebSecurity
@@ -58,9 +61,18 @@ public class SecurityConfig {
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+                        // A patient's device signs in with a pairing code or its device secret.
+                        .requestMatchers(HttpMethod.POST, "/api/auth/device/pair", "/api/auth/device/token").permitAll()
                         // Spring Boot renders error responses on /error; without this, a 400 or 409
                         // raised by a public endpoint would reach the client as 401.
                         .requestMatchers("/error").permitAll()
+                        // Every account may read its own account.
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
+                        // A patient's own device: only PATIENT accounts, for their own record.
+                        .requestMatchers("/api/me/**").hasRole(UserRole.PATIENT.name())
+                        // Everything else is the caregiver API. A PATIENT token is refused here
+                        // (403), whatever PatientAccessService would decide.
+                        .requestMatchers("/api/**").hasAnyRole(UserRole.CAREGIVER.name(), UserRole.ADMIN.name())
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(accountConverter))

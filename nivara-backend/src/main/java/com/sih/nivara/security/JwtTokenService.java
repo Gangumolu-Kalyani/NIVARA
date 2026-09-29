@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * Issues signed access tokens for authenticated accounts.
@@ -23,6 +24,12 @@ public class JwtTokenService {
     /** The iss claim of every token NIVARA issues, and the only one it accepts. */
     public static final String ISSUER = "nivara";
 
+    /**
+     * Names the paired device a PATIENT token was issued to. Such tokens are accepted only while
+     * that device is still active; see AccountJwtAuthenticationConverter.
+     */
+    public static final String DEVICE_CLAIM = "device";
+
     /** A freshly signed token and the instant it stops being accepted. */
     public record IssuedToken(String value, Instant expiresAt) {
     }
@@ -36,15 +43,27 @@ public class JwtTokenService {
     }
 
     public IssuedToken issue(AppUser account) {
+        return issue(account, null);
+    }
+
+    /** A token for a patient's account, bound to the paired device it was issued to. */
+    public IssuedToken issueForDevice(AppUser patientAccount, UUID deviceUuid) {
+        return issue(patientAccount, deviceUuid);
+    }
+
+    private IssuedToken issue(AppUser account, UUID deviceUuid) {
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plus(properties.ttl());
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder builder = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .subject(account.getUuid().toString())
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
-                .claim("role", account.getRole().name())
-                .build();
+                .claim("role", account.getRole().name());
+        if (deviceUuid != null) {
+            builder.claim(DEVICE_CLAIM, deviceUuid.toString());
+        }
+        JwtClaimsSet claims = builder.build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         String value = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         return new IssuedToken(value, expiresAt);

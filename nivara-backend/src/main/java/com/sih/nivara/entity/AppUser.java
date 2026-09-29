@@ -34,14 +34,15 @@ public class AppUser {
     @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
 
-    @Column(name = "email", nullable = false, length = 254, unique = true)
+    /** Null only for PATIENT accounts, which sign in through a paired device (V6). */
+    @Column(name = "email", length = 254, unique = true)
     private String email;
 
     @Column(name = "phone", length = 16)
     private String phone;
 
     /** Password hash only. Never exposed through an API or DTO. */
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
@@ -74,6 +75,16 @@ public class AppUser {
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
+    }
+
+    /**
+     * A PATIENT account: no email and no password, so it can never sign in through
+     * /api/auth/login. It signs in through a device a caregiver has paired.
+     */
+    public static AppUser patientAccount(String fullName, String preferredLanguage) {
+        AppUser account = new AppUser(fullName, null, null, UserRole.PATIENT);
+        account.setPreferredLanguage(preferredLanguage);
+        return account;
     }
 
     public Long getId() {

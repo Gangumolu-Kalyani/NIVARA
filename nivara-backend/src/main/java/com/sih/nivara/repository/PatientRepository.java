@@ -1,5 +1,6 @@
 package com.sih.nivara.repository;
 
+import com.sih.nivara.entity.AppUser;
 import com.sih.nivara.entity.Patient;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -18,4 +19,10 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
      * constraint uq_patients_uuid (V1), so it matches at most one row.
      */
     Optional<Patient> findByUuid(UUID uuid);
+
+    /**
+     * The patient whose own login this account is. Backed by the unique constraint
+     * uq_patients_user_account (V1), so it matches at most one row.
+     */
+    Optional<Patient> findByUserAccount(AppUser userAccount);
 }
