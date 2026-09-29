@@ -119,4 +119,15 @@ public abstract class EmbeddedPostgresIntegrationTest {
         return text(expect(201, "POST", "/api/patients", caregiverToken,
                 "{\"fullName\":\"" + fullName + "\"}").body(), "uuid");
     }
+
+    /**
+     * Pairs a new device for the patient, as a caregiver with EDITOR access, and answers the
+     * patient's access token from that device.
+     */
+    protected String patientToken(String caregiverToken, String patientUuid) {
+        String code = text(expect(201, "POST", "/api/patients/" + patientUuid + "/devices/pairing-code",
+                caregiverToken, "{}").body(), "pairingCode");
+        JsonNode paired = expect(200, "POST", "/api/auth/device/pair", null, "{\"code\":\"" + code + "\"}").body();
+        return text(paired.get("token"), "accessToken");
+    }
 }

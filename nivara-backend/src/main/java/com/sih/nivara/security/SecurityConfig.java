@@ -39,8 +39,8 @@ import java.util.List;
  * support, so there is no session, no cookie and therefore no CSRF surface.
  *
  * <p>Roles decide which part of the API a caller may use: PATIENT accounts, signed in on a paired
- * device, reach only /api/me/** and their own /api/auth/me; the caregiver API is for CAREGIVER
- * and ADMIN accounts. Which patients a caregiver may reach is then decided per request by
+ * device, reach only /api/me/**, the assistant at /api/assistant/** and their own /api/auth/me;
+ * the caregiver API is for CAREGIVER and ADMIN accounts. Which patients a caregiver may reach is then decided per request by
  * PatientAccessService, from patient_caregivers.
  */
 @Configuration
@@ -70,6 +70,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         // A patient's own device: only PATIENT accounts, for their own record.
                         .requestMatchers("/api/me/**").hasRole(UserRole.PATIENT.name())
+                        // The assistant serves patients and caregivers. AssistantService decides
+                        // which conversations and which patient each of them may reach.
+                        .requestMatchers("/api/assistant/**").hasAnyRole(
+                                UserRole.PATIENT.name(), UserRole.CAREGIVER.name(), UserRole.ADMIN.name())
                         // Everything else is the caregiver API. A PATIENT token is refused here
                         // (403), whatever PatientAccessService would decide.
                         .requestMatchers("/api/**").hasAnyRole(UserRole.CAREGIVER.name(), UserRole.ADMIN.name())
