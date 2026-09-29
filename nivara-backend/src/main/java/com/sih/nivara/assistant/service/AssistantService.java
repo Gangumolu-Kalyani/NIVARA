@@ -6,6 +6,7 @@ import com.sih.nivara.assistant.entity.enums.AssistantMode;
 import com.sih.nivara.assistant.llm.LlmClient;
 import com.sih.nivara.assistant.llm.LlmReply;
 import com.sih.nivara.assistant.llm.LlmRequest;
+import com.sih.nivara.assistant.tool.AssistantToolRegistry;
 import com.sih.nivara.entity.AppUser;
 import com.sih.nivara.service.PatientAccessService;
 import org.springframework.stereotype.Service;
@@ -48,15 +49,18 @@ public class AssistantService {
     private final ConversationService conversationService;
     private final PatientAccessService patientAccessService;
     private final LlmClient llmClient;
+    private final AssistantToolRegistry toolRegistry;
 
     public AssistantService(AssistantContextResolver contextResolver,
                             ConversationService conversationService,
                             PatientAccessService patientAccessService,
-                            LlmClient llmClient) {
+                            LlmClient llmClient,
+                            AssistantToolRegistry toolRegistry) {
         this.contextResolver = contextResolver;
         this.conversationService = conversationService;
         this.patientAccessService = patientAccessService;
         this.llmClient = llmClient;
+        this.toolRegistry = toolRegistry;
     }
 
     /**
@@ -136,9 +140,16 @@ public class AssistantService {
         return requireOwned(conversationUuid, caller);
     }
 
-    private static LlmRequest toLlmRequest(AssistantContext context, List<AssistantMessage> history) {
-        return new LlmRequest(context.mode(), context.languageCode(), history.stream()
-                .map(m -> new LlmRequest.Message(m.getSender(), m.getContent()))
-                .toList());
+    /**
+     * The model is offered the tools of this conversation's mode. Phase 3 stops there: no model
+     * asks for a tool yet, so nothing here runs one. When one does, the call goes through
+     * ToolExecutor with this same context.
+     */
+    private LlmRequest toLlmRequest(AssistantContext context, List<AssistantMessage> history) {
+        return new LlmRequest(context.mode(), context.languageCode(),
+                history.stream()
+                        .map(m -> new LlmRequest.Message(m.getSender(), m.getContent()))
+                        .toList(),
+                toolRegistry.toolsFor(context.mode()));
     }
 }

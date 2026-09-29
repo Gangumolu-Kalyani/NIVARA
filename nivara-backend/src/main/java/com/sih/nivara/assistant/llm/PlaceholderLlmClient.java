@@ -4,7 +4,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Stands in for a language model until one is connected (Phase 4): always gives the same answer,
- * makes no network call, and needs no configuration or credentials.
+ * makes no network call, and needs no configuration or credentials. It ignores the tools it is
+ * offered and never asks for one to run.
  */
 @Component
 public class PlaceholderLlmClient implements LlmClient {
