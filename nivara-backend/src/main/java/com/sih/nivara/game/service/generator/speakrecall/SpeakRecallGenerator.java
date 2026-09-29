@@ -57,7 +57,10 @@ public class SpeakRecallGenerator implements GameGenerator {
         var places = placeService.findByPatient(patient);
         var objects = personalObjectService.findByPatient(patient);
         
-        long total = people.size() + places.size() + objects.size();
+        // Only items marked for games count, matching what generate() uses
+        long total = people.stream().filter(Person::isIncludeInGames).count()
+                + places.stream().filter(Place::isIncludeInGames).count()
+                + objects.stream().filter(PersonalObject::isIncludeInGames).count();
         
         // Need at least 1 item for level 1
         return total >= 1;

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,4 +35,12 @@ public interface GameResultRepository extends JpaRepository<GameResult, Long> {
      */
     @EntityGraph(attributePaths = {"patient", "game"})
     List<GameResult> findByPatientOrderByStartedAtDescIdDesc(Patient patient);
+
+    /**
+     * One patient's attempts started in [from, to), most recent first, without answers. Serves the
+     * progress and daily-summary views over index ix_game_results_patient_started.
+     */
+    @EntityGraph(attributePaths = {"patient", "game"})
+    List<GameResult> findByPatientAndStartedAtGreaterThanEqualAndStartedAtLessThanOrderByStartedAtDescIdDesc(
+            Patient patient, Instant from, Instant to);
 }

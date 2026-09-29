@@ -233,7 +233,7 @@ Each game pulls from patient's personalized data:
 ## Configuration
 
 No additional configuration required. The module uses existing:
-- Database schema (no new migrations)
+- Database schema: no new tables, but each game code needs a row in the `games` catalog (added by `V4__add_generated_games_to_catalog.sql`)
 - Authentication system
 - Authorization model
 

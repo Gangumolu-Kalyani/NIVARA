@@ -2,7 +2,11 @@
 
 **NIVARA** is a personalized cognitive and memory-assistance platform for elderly users, built for the Smart India Hackathon. Caregivers record the people, places, objects and everyday events in a patient's life, and the patient plays cognitive games built around those memories. The results feed progress tracking and, later, AI-driven recommendations.
 
-This repository contains the **backend**: a Spring Boot REST API on PostgreSQL.
+This repository contains:
+
+- **`nivara-backend/`**: a Spring Boot REST API on PostgreSQL (this README)
+- **`nivara-frontend/`**: the caregiver dashboard, a React + TypeScript app (see [its README](nivara-frontend/README.md))
+- **`qwen_chat.py`**: a scratch script that calls a Qwen model on AWS Bedrock, for the planned AI features. It is not used by the application.
 
 ---
 
@@ -32,9 +36,14 @@ This repository contains the **backend**: a Spring Boot REST API on PostgreSQL.
 | Caregiver accounts, login, JWT authentication | Done |
 | Patients, with care-team authorization (OWNER / EDITOR / VIEWER) | Done |
 | Personal memory: people, places, personal objects, memories | Done |
-| Game catalog (8 seeded games) and game-result recording | Done |
+| Game catalog (14 games) and game-result recording | Done |
+| Personalized game generation (6 games) with progressive hints | Done |
+| Daily Assistance reminders, with nudges and escalation | Done |
+| Alert center | Done |
+| Caregiver dashboard, progress analytics and daily summary | Done |
+| Caregiver frontend | Done (see `nivara-frontend/`) |
 | Game recommendations (AI) | Schema only, no API yet |
-| Dashboard / progress analytics, reminders, voice assistant, patient login | Not started |
+| Voice assistant, patient login, push notifications | Not started |
 
 ---
 
@@ -55,6 +64,7 @@ This repository contains the **backend**: a Spring Boot REST API on PostgreSQL.
 
 ```
 NIVARA/
+├── nivara-frontend/                  # caregiver dashboard (React + Vite); see its README
 └── nivara-backend/
     ├── pom.xml
     ├── .env.example                  # copy to .env and fill in (never commit .env)
@@ -68,11 +78,12 @@ NIVARA/
         │   ├── entity/               # JPA entities mapped onto the Flyway schema
         │   │   └── enums/            # one enum per CHECK-constrained column
         │   ├── repository/           # Spring Data JPA repositories
-        │   ├── service/              # transactions, business rules, authorization
-        │   └── security/             # JWT, SecurityConfig, CurrentUserProvider
+        │   ├── service/              # transactions, business rules, authorization, reminder scheduler
+        │   ├── game/                 # game generation, hints and result submission
+        │   └── security/             # JWT, CORS, SecurityConfig, CurrentUserProvider
         └── resources/
             ├── application.properties
-            └── db/migration/         # V1, V2, V3 (Flyway)
+            └── db/migration/         # V1 to V5 (Flyway)
 ```
 
 ---
@@ -105,6 +116,9 @@ DB_USERNAME=nivara_app
 DB_PASSWORD=choose-a-password
 # At least 32 random bytes. For example: openssl rand -base64 48
 JWT_SECRET=
+# Optional: browser origins allowed to call the API, comma-separated.
+# Defaults to the Vite dev server, http://localhost:5173.
+CORS_ALLOWED_ORIGINS=
 ```
 
 - **`JWT_SECRET` is required, and has no default.** The application refuses to start if it is missing or shorter than 32 bytes, and tells you which.
@@ -118,7 +132,7 @@ cd nivara-backend
 ./mvnw spring-boot:run          # Windows: .\mvnw.cmd spring-boot:run
 ```
 
-On first start Flyway applies V1–V3 and seeds the game catalog. Check that it's up:
+On first start Flyway applies V1–V5 and seeds the game catalog. Check that it's up:
 
 ```bash
 curl http://localhost:8080/api/health
@@ -273,7 +287,18 @@ People, places and objects are a patient's reference data. Memories are events t
 - If the same uuid arrives again for the same patient, the stored attempt is returned with **200** and nothing new is written.
 - The same uuid under another patient returns **409**.
 
-The seeded game codes are:
+The catalog has 14 games. These six can be **generated** from the patient's own data (see [the games module](nivara-backend/GAMES_MODULE_SUMMARY.md)):
+
+- `MEMORY_MATCH`, `MEMORY_TIMELINE`, `REVEAL_REMEMBER`, `FAMILY_RECOGNITION`, `MATCH_IT`, `SPEAK_RECALL`
+
+| Method | Path | Access | Result |
+|---|---|---|---|
+| GET | `/api/patients/{p}/games/available` | VIEWER | 200: every active game, and whether this patient has enough content to play it |
+| POST | `/api/patients/{p}/games/generate` | EDITOR | 201: a game instance built from the patient's data. Body: `gameCode`, `difficulty`, `languageCode` |
+| GET | `/api/patients/{p}/games/{instanceId}/hint` | VIEWER | 200: the next hint level |
+| POST | `/api/patients/{p}/games/submit-result` | EDITOR | 201: records the attempt, like `POST /game-results` |
+
+These eight are in the catalog for recording results, but have no generator yet:
 
 - `FACE_NAME_MATCH`
 - `RELATIONSHIP_RECALL`
@@ -284,6 +309,61 @@ The seeded game codes are:
 - `PATTERN_SEQUENCE`
 - `ATTENTION_FOCUS`
 
+### Daily Assistance: reminders
+
+A reminder is a schedule: a category (`MEDICINE`, `HYDRATION`, `APPOINTMENT`, `MOVEMENT`, `COGNITIVE_ACTIVITY`, `MEAL`), a `scheduledTime` in the **patient's timezone**, and a repeat rule: `DAILY`, `WEEKLY` with `repeatDays` (`MON`…`SUN`), or `ONCE` with `oneOffDate`.
+
+| Method | Path | Access | Result |
+|---|---|---|---|
+| POST | `/api/patients/{p}/reminders` | EDITOR | 201 + `Location`. 400 if a WEEKLY has no days or a ONCE no date |
+| GET | `/api/patients/{p}/reminders` | VIEWER | 200: active and paused reminders, by time of day |
+| GET / PUT / DELETE | `/api/reminders/{uuid}` | VIEWER / EDITOR / EDITOR | PUT replaces it, including `active`; DELETE answers 204 |
+| POST | `/api/reminders/{uuid}/responses` | EDITOR | 200: records the patient's answer. Body: `responseType` (`TAKEN`, `REMIND_LATER`, `NEED_HELP`), optional `scheduledAt` |
+| GET | `/api/reminders/{uuid}/responses` | VIEWER | 200: every occurrence of the reminder, newest first |
+| GET | `/api/patients/{p}/daily-care?date=` | VIEWER | 200: that day's occurrences in time order; today by default |
+
+**How a reminder plays out**
+
+Each time a reminder falls due, an **occurrence** records what happened:
+
+1. `PENDING` until its time. When it falls due, the patient is nudged and it becomes `SENT`.
+2. While no answer comes, it is nudged again every 15 minutes (`nivara.reminders.nudge-interval`).
+3. After `escalateAfterMissed` unanswered nudges (1–10, default 2) it becomes `ESCALATED` and an **alert** is raised.
+4. The patient's answer: `TAKEN` completes it (`COMPLETED`), even after an escalation. `REMIND_LATER` marks it `SEEN` and restarts the 15 minutes, but not the count. `NEED_HELP` escalates it at once, with a HIGH alert.
+5. Still unanswered when the patient's day ends, it becomes `MISSED`.
+
+A background scheduler runs this every minute. Set `nivara.reminders.scheduler.enabled=false` to switch it off.
+
+**Rules**
+
+- Occurrences exist for today and past days only. A reminder created or rescheduled at 10:00 for 09:00 starts tomorrow; it never appears already overdue.
+- Changing a reminder's schedule, or switching it off, drops only its future occurrences that nothing has happened to yet. History is always kept.
+- DELETE hides the reminder from the API but keeps its occurrence history.
+
+### Alerts
+
+Alerts are raised by the system, never through the API. An unanswered reminder's severity depends on its category: `MEDICINE` and `APPOINTMENT` are HIGH, `MEAL` and `HYDRATION` MEDIUM, `MOVEMENT` and `COGNITIVE_ACTIVITY` LOW.
+
+| Method | Path | Access | Result |
+|---|---|---|---|
+| GET | `/api/patients/{p}/alerts?status=` | VIEWER | 200: newest first; `status` is optional (`OPEN`, `RESOLVED`, `DISMISSED`) |
+| GET | `/api/alerts/{uuid}` | VIEWER | 200 |
+| PUT | `/api/alerts/{uuid}/resolve` | EDITOR | 200. 409 if it is already closed |
+| PUT | `/api/alerts/{uuid}/dismiss` | EDITOR | 200. 409 if it is already closed |
+
+### Dashboard
+
+All three are read-only views, computed on request, over the patient's calendar days in their timezone.
+
+| Method | Path | Access | Result |
+|---|---|---|---|
+| GET | `/api/patients/{p}/dashboard` | VIEWER | 200: today's care status, activity cards, reminder counts, upcoming appointments (next 7 days) and open alerts |
+| GET | `/api/patients/{p}/progress?range=7` | VIEWER | 200: game performance over the last `range` days (1–90): accuracy, reaction time, per-domain accuracy, difficulty mix, daily trend, recent attempts |
+| GET | `/api/patients/{p}/daily-summary?date=` | VIEWER | 200: plain-language summary lines, care rhythm per part of the day, and patterns over the last 7 days; today by default |
+
+- **Care status** is `NEEDS_ATTENTION` when a HIGH alert is open or any of today's reminders was missed or escalated, and `ON_TRACK` otherwise. It describes daily care, never a medical condition.
+- **Accuracy** figures average `COMPLETED` attempts only.
+
 ### Status codes
 
 | Code | Meaning |
@@ -293,7 +373,7 @@ The seeded game codes are:
 | 401 | missing, invalid or expired token, or a disabled account; also a failed login |
 | 403 | linked to the patient, but the access level is too low |
 | 404 | doesn't exist, **or** the caller has no access to it |
-| 409 | duplicate email, duplicate care-team grant, a second primary, removing or demoting the last OWNER, or a game-result uuid owned by another patient |
+| 409 | duplicate email, duplicate care-team grant, a second primary, removing or demoting the last OWNER, a game-result uuid owned by another patient, answering an already-completed reminder, or closing an already-closed alert |
 
 ---
 
@@ -316,6 +396,13 @@ The seeded game codes are:
 | `MemorySource` | `CAREGIVER`, `PATIENT_VOICE`, `SYSTEM` |
 | `TimeOfDay` | `MORNING`, `AFTERNOON`, `EVENING`, `NIGHT` |
 | `GameResultStatus` | `COMPLETED`, `ABANDONED` |
+| `ReminderCategory` | `MEDICINE`, `HYDRATION`, `APPOINTMENT`, `MOVEMENT`, `COGNITIVE_ACTIVITY`, `MEAL` |
+| `ReminderRepeatType` | `DAILY`, `WEEKLY`, `ONCE` |
+| `DayOfWeekCode` | `MON`, `TUE`, `WED`, `THU`, `FRI`, `SAT`, `SUN` |
+| `ReminderResponseStatus` | `PENDING`, `SENT`, `SEEN`, `COMPLETED`, `MISSED`, `ESCALATED` |
+| `PatientResponseType` | `TAKEN`, `REMIND_LATER`, `NEED_HELP` |
+| `AlertSeverity` | `HIGH`, `MEDIUM`, `LOW` |
+| `AlertStatus` | `OPEN`, `RESOLVED`, `DISMISSED` |
 | `CognitiveDomain` | `MEMORY`, `ATTENTION`, `LANGUAGE`, `EXECUTIVE_FUNCTION`, `ORIENTATION`, `VISUOSPATIAL`, `PROCESSING_SPEED` |
 
 - **Language codes** follow `^[a-z]{2,3}(-[A-Z]{2})?$`, for example `en`, `hi`, `en-IN`.
@@ -331,6 +418,8 @@ The schema is owned by **Flyway**. Hibernate runs with `ddl-auto=validate`, so i
 | `V1__create_accounts_and_caregiver_access.sql` | `app_users`, `patients`, `patient_caregivers` |
 | `V2__create_personal_memory_tables.sql` | `people`, `places`, `personal_objects`, `memories`, `memory_people`, `memory_objects` |
 | `V3__create_games_and_results.sql` | `games` (seeded with 8 games), `game_recommendations`, `game_results`, `game_result_answers` |
+| `V4__add_generated_games_to_catalog.sql` | adds the 6 generated games to `games` |
+| `V5__create_reminders_and_alerts.sql` | `reminders`, `reminder_occurrences`, `alerts` |
 
 **Rules for changing the schema**
 
@@ -367,6 +456,9 @@ The schema is owned by **Flyway**. Hibernate runs with `ddl-auto=validate`, so i
 - **An extra public endpoint.** Spring Security 7 also publishes the standard, non-sensitive `/.well-known/oauth-protected-resource` metadata document without authentication.
 - **Lists aren't paged,** and they don't exclude soft-deleted rows.
 - **Care-team grant `Location`.** It points to `/api/patients/{p}/caregivers/{uuid}`, which supports PUT and DELETE only.
+- **Nudges are recorded, not delivered.** There is no patient app or push channel yet. A nudge records when the patient should have been prompted, and caregivers see escalations in the alert center.
+- **Patients can't answer reminders themselves.** Patients have no logins yet, so a caregiver with EDITOR access records the patient's answers.
+- **One scheduler instance.** Several backend instances would each run the reminder scheduler. Optimistic locking keeps the data consistent, but they would repeat each other's work.
 
 ---
 
@@ -376,9 +468,8 @@ Likely next steps, not yet scheduled:
 
 - Global exception handling with structured error bodies
 - Game recommendations API: the `game_recommendations` table already exists
-- A progress dashboard for caregivers, built on game results
-- Patient logins, via `patients.user_account_id`
-- Reminders: these need a new migration
+- Patient logins, via `patients.user_account_id`, so patients can answer their own reminders
+- Push notifications for reminder nudges and alerts
 - AI recommendations and the voice assistant
 
 ---
@@ -400,3 +491,5 @@ The backend was built in reviewed phases, each verified before the next began.
 | 9 | Game catalog and game-result recording |
 | 10 | Authentication: accounts, login, JWT |
 | 11 | Authorization: caregiver-to-patient access control and the care-team API |
+| 12 | Games module: six generated games with hints; catalog entries (V4) |
+| 13 | Daily Assistance reminders, alerts and the caregiver dashboard APIs (V5); CORS for the frontend |

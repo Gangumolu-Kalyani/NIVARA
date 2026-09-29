@@ -10,7 +10,7 @@ import com.sih.nivara.game.dto.response.GeneratedGameResponse;
 import com.sih.nivara.game.dto.response.GeneratedQuestion;
 import com.sih.nivara.game.dto.response.Option;
 import com.sih.nivara.game.service.GameGenerator;
-import com.sih.nivara.service.PatientAccessService;
+import com.sih.nivara.service.PersonService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -27,10 +27,10 @@ import java.util.stream.Collectors;
 @Service
 public class MemoryMatchGenerator implements GameGenerator {
 
-    private final PatientAccessService patientAccessService;
+    private final PersonService personService;
 
-    public MemoryMatchGenerator(PatientAccessService patientAccessService) {
-        this.patientAccessService = patientAccessService;
+    public MemoryMatchGenerator(PersonService personService) {
+        this.personService = personService;
     }
 
     @Override
@@ -186,9 +186,10 @@ public class MemoryMatchGenerator implements GameGenerator {
      * Gets people that are marked as includeInGames.
      */
     private List<Person> getIncludeInGamesPeople(Patient patient) {
-        // In real implementation, this would query the database
-        // For now, return an empty list (the actual people would come from service layer)
-        return new ArrayList<>();
+        // A mutable copy, because generate() sorts it
+        return personService.findByPatient(patient).stream()
+                .filter(Person::isIncludeInGames)
+                .collect(Collectors.toCollection(ArrayList::new));
     }
     
     /**

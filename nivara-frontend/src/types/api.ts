@@ -1,6 +1,6 @@
 // Mirrors of the backend response/request DTOs this app actually uses.
-// Kept in sync by hand with nivara-backend/src/main/java/com/sih/nivara/dto — see README
-// "Integration points for Person 3" for the contract this was built against.
+// Kept in sync by hand with nivara-backend/src/main/java/com/sih/nivara/dto (request/ and
+// response/): the backend DTO records are the contract.
 
 export type AccessLevel = "OWNER" | "EDITOR" | "VIEWER";
 export type RelationshipType =

@@ -59,12 +59,11 @@ public class MemoryTimelineGenerator implements GameGenerator {
         var allMemories = memoryService.findByPatient(patient);
         
         // Filter to only memories marked for games
+        // Sorted by date (ascending - oldest first); toList() is unmodifiable, so sort in the stream
         var memories = allMemories.stream()
                 .filter(Memory::isIncludeInGames)
+                .sorted(Comparator.comparing(Memory::getOccurredOn))
                 .toList();
-        
-        // Sort by date (ascending - oldest first)
-        memories.sort(Comparator.comparing(Memory::getOccurredOn));
         
         // Determine number of events based on difficulty
         int numEvents = getEventsForDifficulty(request.difficulty());

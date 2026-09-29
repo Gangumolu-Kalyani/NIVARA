@@ -1,9 +1,11 @@
 package com.sih.nivara.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -17,10 +19,15 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.List;
 
 /**
  * HTTP security: stateless bearer-token authentication for the whole API.
@@ -42,6 +49,7 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http,
                                             AccountJwtAuthenticationConverter accountConverter) throws Exception {
         http
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -62,6 +70,26 @@ public class SecurityConfig {
                         .protectedResourceMetadata(metadata -> metadata.protectedResourceMetadataCustomizer(
                                 builder -> builder.tlsClientCertificateBoundAccessTokens(false))));
         return http.build();
+    }
+
+    /**
+     * Lets the browser frontend call the API from its own origin (the Vite dev server by default).
+     * Only the origins listed in nivara.cors.allowed-origins are accepted. No cookies are involved,
+     * since tokens travel in the Authorization header, so credentials stay disallowed.
+     */
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(
+            @Value("${nivara.cors.allowed-origins:http://localhost:5173}") List<String> allowedOrigins) {
+        CorsConfiguration cors = new CorsConfiguration();
+        cors.setAllowedOrigins(allowedOrigins);
+        cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        cors.setExposedHeaders(List.of("Location"));
+        cors.setMaxAge(Duration.ofHours(1));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", cors);
+        return source;
     }
 
     /** BCrypt through the delegating encoder, so stored hashes carry their {bcrypt} algorithm id. */

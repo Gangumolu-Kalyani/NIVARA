@@ -48,7 +48,9 @@ public class MatchItGenerator implements GameGenerator {
         var objects = personalObjectService.findByPatient(patient);
         var places = placeService.findByPatient(patient);
         
-        long total = objects.size() + places.size();
+        // Only items marked for games count, matching what generate() uses
+        long total = objects.stream().filter(PersonalObject::isIncludeInGames).count()
+                + places.stream().filter(Place::isIncludeInGames).count();
         
         // Need at least 2 items for difficulty 1
         return total >= 2;
